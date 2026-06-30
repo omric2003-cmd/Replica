@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Replica — Script to Translation Sheet</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#f4f6f5; --panel:#ffffff; --ink:#17211e; --muted:#5f6b67;
+    --line:#e2e7e5; --brand:#0d9488; --brand-d:#0f766e; --btn-ink:#ffffff;
+    --ok:#1a7f55; --warn:#b8860b; --warn-bg:#fdf6e3; --bad:#b23b3b; --ignore:#8a938f;
+    --chip:#dcf1ec; --raised:#fbfcfc; --hover:#eef2f1; --focus-ring:rgba(13,148,136,.18);
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.1);
+  }
+  html[data-theme="dark"]{
+    --bg:#0e1513; --panel:#15201d; --ink:#e7edeb; --muted:#95a39e;
+    --line:#28332f; --brand:#2dd4bf; --brand-d:#5eead4; --btn-ink:#06211d;
+    --ok:#34d399; --warn:#e3b341; --warn-bg:#2a2410; --bad:#f87171; --ignore:#7c8884;
+    --chip:#163029; --raised:#1a2522; --hover:#212e2a; --focus-ring:rgba(45,212,191,.22);
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 1px 3px rgba(0,0,0,.45);
+  }
+  html,body{transition:background-color .2s,color .2s}
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink)}
+  header.app{background:var(--panel);border-bottom:1px solid var(--line);padding:12px 22px;
+    display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10}
+  header.app h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.01em}
+  header.app .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);
+    padding:2px 7px;border-radius:20px}
+  header.app .spacer{flex:1}
+  header.app .who{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:10px}
+  header.app .who b{color:var(--ink);font-weight:600}
+  .themebtn{border:1px solid var(--line);background:var(--raised);color:var(--ink);
+    width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:15px;line-height:1;
+    display:grid;place-items:center}
+  .themebtn:hover{background:var(--hover)}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px}
+  .stepper{display:flex;gap:10px;margin:0 0 22px;flex-wrap:wrap}
+  .step{display:flex;align-items:center;gap:11px;font-size:14.5px;font-weight:600;color:var(--muted);
+    padding:12px 20px;border-radius:11px;background:var(--panel);border:1px solid var(--line)}
+  .step .n{width:27px;height:27px;border-radius:50%;display:grid;place-items:center;
+    font-size:13px;background:var(--chip);color:var(--brand);font-weight:700}
+  .step.active{color:var(--ink);border-color:var(--brand);box-shadow:var(--shadow)}
+  .step.active .n{background:var(--brand);color:var(--btn-ink)}
+  .step.done .n{background:var(--ok);color:var(--btn-ink)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    box-shadow:var(--shadow);padding:24px}
+  h2.sec{font-size:15px;margin:0 0 4px}
+  p.sub{color:var(--muted);margin:0 0 18px;font-size:13px}
+  .drop{border:2px dashed var(--line);border-radius:11px;padding:22px 18px;text-align:center;
+    transition:.15s;background:var(--raised);cursor:pointer}
+  .drop.over{border-color:var(--brand);background:var(--chip)}
+  .drop .ic{font-size:22px}
+  .drop .big{font-size:14px;font-weight:600;margin:5px 0 1px}
+  .drop .sm{color:var(--muted);font-size:12px}
+  .btn{appearance:none;border:1px solid var(--brand);background:var(--brand);color:var(--btn-ink);
+    padding:9px 16px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer}
+  .btn:hover{background:var(--brand-d);border-color:var(--brand-d)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:var(--panel);color:var(--ink);border-color:var(--line)}
+  .btn.ghost:hover{background:var(--hover)}
+  .btn.sm{padding:5px 10px;font-size:12px;border-radius:6px}
+  .btn.tiny{padding:4px 9px;font-size:11.5px;border-radius:6px}
+  .row-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;align-items:center}
+  .status{margin-top:16px;font-size:13px;color:var(--muted)}
+  .filechip{display:inline-flex;align-items:center;gap:8px;background:var(--chip);
+    border-radius:8px;padding:6px 12px;color:var(--ink);font-size:13px;margin-top:14px}
+  .link{background:none;border:none;color:var(--brand);cursor:pointer;font-size:12.5px;
+    text-decoration:underline;padding:0}
+  details.rules{margin-top:14px;font-size:12.5px;color:var(--muted)}
+  details.rules summary{cursor:pointer;color:var(--brand)}
+  details.rules li{margin:3px 0}
+  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .toolbar .spacer{flex:1}
+  .pill{font-size:11.5px;padding:3px 9px;border-radius:20px;background:var(--chip);color:var(--brand)}
+  .legend{display:flex;gap:12px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .tablewrap{border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:60vh}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  thead th{position:sticky;top:0;background:var(--hover);text-align:left;padding:9px 10px;
+    border-bottom:1px solid var(--line);font-weight:650;font-size:11.5px;letter-spacing:.03em;
+    color:var(--muted);text-transform:uppercase;white-space:nowrap}
+  tbody td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:hover{background:var(--hover)}
+  tr.ignored{opacity:.5}
+  tr.ignored td .src,tr.ignored td .dlg{text-decoration:line-through}
+  .src{font-weight:600;white-space:nowrap}
+  .src[contenteditable],.dlg[contenteditable]{outline:none;border-radius:4px;padding:2px 4px;margin:-2px -4px}
+  .src[contenteditable]:focus,.dlg[contenteditable]:focus{background:var(--chip);box-shadow:0 0 0 1px var(--brand)}
+  .stat{display:inline-flex;align-items:center;font-size:11px;font-weight:700;
+    padding:2px 8px;border-radius:20px;white-space:nowrap}
+  .stat.valid{background:#e7f5ee;color:var(--ok)}
+  .stat.suspicious{background:var(--warn-bg);color:var(--warn)}
+  .stat.ignored{background:#eef0f3;color:var(--ignore)}
+  .acts{display:flex;gap:4px;flex-wrap:wrap}
+  .iact{border:1px solid var(--line);background:var(--raised);border-radius:6px;padding:3px 7px;
+    font-size:11px;cursor:pointer;color:var(--ink)}
+  .iact:hover{background:var(--hover)}
+  .iact.danger:hover{background:var(--hover);color:var(--bad);border-color:var(--bad)}
+  .opt{display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border:1px solid var(--line);
+    border-radius:10px;margin-bottom:10px}
+  .opt input{margin-top:3px;width:16px;height:16px;accent-color:var(--brand)}
+  .opt .t{font-weight:600}
+  .opt .d{color:var(--muted);font-size:12.5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .card{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .card .v{font-size:24px;font-weight:700;letter-spacing:-.02em}
+  .card .k{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .dl{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0 18px}
+  .warnbox{background:var(--warn-bg);border:1px solid var(--warn);border-radius:10px;padding:13px 15px;
+    font-size:12.5px;color:var(--warn);margin-bottom:16px}
+  .warnbox b{color:var(--warn)}
+  .hidden{display:none !important}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--brand);
+    border-radius:50%;animation:sp .7s linear infinite;vertical-align:-3px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  /* auth overlay + modal */
+  .overlay{position:fixed;inset:0;background:rgba(28,35,48,.55);backdrop-filter:blur(2px);
+    display:grid;place-items:center;z-index:50;padding:20px}
+  .modal{background:var(--panel);border-radius:14px;box-shadow:0 20px 60px rgba(16,24,40,.25);
+    width:100%;max-width:400px;padding:26px}
+  .modal.wide{max-width:560px}
+  .modal h3{margin:0 0 4px;font-size:17px}
+  .modal p.m{color:var(--muted);font-size:12.5px;margin:0 0 18px}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600}
+  .field input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;
+    background:var(--raised);color:var(--ink)}
+  .field input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--focus-ring)}
+  .authmsg{font-size:12.5px;margin:10px 0 0;min-height:16px}
+  .authmsg.err{color:var(--bad)}
+  .authmsg.ok{color:var(--ok)}
+  .tabs{display:flex;gap:6px;margin-bottom:18px}
+  .tabs button{flex:1;padding:8px;border:1px solid var(--line);background:var(--raised);border-radius:8px;
+    font-size:12.5px;font-weight:600;cursor:pointer;color:var(--muted)}
+  .tabs button.on{background:var(--brand);color:var(--btn-ink);border-color:var(--brand)}
+  .e2e{font-size:11.5px;color:var(--muted);background:var(--chip);border:1px solid var(--line);
+    border-radius:8px;padding:9px 11px;margin-top:14px;line-height:1.45}
+  .plist{display:flex;flex-direction:column;gap:8px;max-height:48vh;overflow:auto}
+  .pitem{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .pitem .meta{flex:1;min-width:0}
+  .pitem .meta .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pitem .meta .sm{font-size:11.5px;color:var(--muted)}
+  .modal .x{float:right;border:none;background:none;font-size:20px;color:var(--muted);cursor:pointer;line-height:1}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:26px 0}
+  @media(max-width:720px){.cards{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="app">
+  <h1>Replica</h1>
+  <span class="tag">Script → translation sheet</span>
+  <div class="spacer"></div>
+  <div class="who" id="who"></div>
+  <button class="themebtn" id="themeBtn" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
+</header>
+
+<div class="wrap">
+  <div class="stepper" id="stepper">
+    <div class="step" data-s="1"><span class="n">1</span> Upload</div>
+    <div class="step" data-s="2"><span class="n">2</span> Review</div>
+    <div class="step" data-s="3"><span class="n">3</span> Export</div>
+    <div class="step" data-s="4"><span class="n">4</span> Results</div>
+  </div>
+
+  <!-- STEP 1: UPLOAD -->
+  <section class="panel" id="screen1">
+    <h2 class="sec">Upload a script PDF</h2>
+    <p class="sub">One episode at a time. Dialogue is detected from uppercase speaker labels.</p>
+    <div class="drop" id="drop">
+      <div class="ic">📄</div>
+      <div class="big">Drag &amp; drop your script PDF here</div>
+      <div class="sm">or click to choose a file · PDF only</div>
+    </div>
+    <input type="file" id="file" accept="application/pdf" class="hidden" />
+    <div id="fileinfo"></div>
+    <div class="row-actions">
+      <button class="btn" id="extractBtn" disabled>Extract dialogue</button>
+      <button class="btn ghost" id="openProjectsBtn">My projects</button>
+      <button class="link" id="rulesToggle" type="button">View parsing rules</button>
+    </div>
+    <details class="rules" id="rulesBox">
+      <summary>Parsing rules</summary>
+      <ul>
+        <li><b>Speaker labels</b> — standalone UPPERCASE name lines start a dialogue row (incl. grouped names like CHLOE/EMMA).</li>
+        <li><b>Wrapped dialogue</b> — following non-speaker lines are joined until the next speaker or a blank line.</li>
+        <li><b>Scene headers</b> — lines such as "1 EXT. GARDEN - DAY" are ignored.</li>
+        <li><b>Description / action</b> — prose paragraphs without a speaker label are ignored.</li>
+        <li><b>Review flags</b> — ambiguous rows are marked <i>suspicious</i> for you to confirm.</li>
+      </ul>
+    </details>
+    <div class="status" id="status1"></div>
+  </section>
+
+  <!-- STEP 2: REVIEW -->
+  <section class="panel hidden" id="screen2">
+    <h2 class="sec">Review extracted dialogue</h2>
+    <p class="sub">Fix mistakes before export. Edit inline; use row actions to merge, split, ignore, or restore.</p>
+    <div class="toolbar">
+      <span class="pill" id="countPill">0 rows</span>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--ok)"></span>valid</span>
+        <span><span class="dot" style="background:var(--warn)"></span>suspicious</span>
+        <span><span class="dot" style="background:var(--ignore)"></span>ignored</span>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" id="saveBtn">Save project</button>
+      <button class="btn ghost sm" id="addRowBtn">+ Add row</button>
+      <button class="btn ghost sm" id="backTo1">Back</button>
+      <button class="btn sm" id="toExport">Continue to export</button>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th style="width:46px">#</th>
+          <th style="width:150px">Source</th>
+          <th>Dialogue</th>
+          <th style="width:96px">Status</th>
+          <th style="width:230px">Actions</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- STEP 3: EXPORT -->
+  <section class="panel hidden" id="screen3">
+    <h2 class="sec">Export options</h2>
+    <p class="sub">Choose what to generate. Outputs match the standard dubbing workbook and Word table formats.</p>
+    <label class="opt"><input type="checkbox" id="optXlsx" checked>
+      <div><div class="t">Excel workbook (.xlsx)</div>
+      <div class="d">Sheet 1: TIMECODE IN · SOURCE · DIALOGUE · TRANSLATION. Sheet 2: character appearance counts.</div></div></label>
+    <label class="opt"><input type="checkbox" id="optDocx" checked>
+      <div><div class="t">Word document (.docx)</div>
+      <div class="d">Numbered table: No. · SOURCE · DIALOGUE · TRANSLATION, RTL-ready for Hebrew.</div></div></label>
+    <div class="grid2">
+      <label class="opt"><input type="checkbox" id="optBlankTc" checked>
+        <div><div class="t">Leave TIMECODE IN blank</div>
+        <div class="d">Timecodes can be added later from a spotting file.</div></div></label>
+      <label class="opt"><input type="checkbox" id="optRtl">
+        <div><div class="t">RTL translation column</div>
+        <div class="d">Format the (empty) translation column right-to-left for Hebrew.</div></div></label>
+    </div>
+    <div class="warnbox" style="margin-top:8px">Translation columns are left blank in this version — a draft is for dubbing adaptation, not a final studio script. AI Hebrew suggestions are planned for a later release.</div>
+    <div class="row-actions">
+      <button class="btn ghost" id="backTo2">Back</button>
+      <button class="btn" id="generateBtn">Generate files</button>
+    </div>
+    <div class="status" id="status3"></div>
+  </section>
+
+  <!-- STEP 4: RESULTS -->
+  <section class="panel hidden" id="screen4">
+    <h2 class="sec">Done</h2>
+    <p class="sub">Your translator-ready files are below, with a short processing report.</p>
+    <div class="cards" id="cards"></div>
+    <div id="warnArea"></div>
+    <div class="dl" id="downloads"></div>
+    <div class="row-actions">
+      <button class="btn ghost" id="saveBtn2">Save project</button>
+      <button class="btn ghost" id="newEpisode">Start new episode</button>
+    </div>
+  </section>
+</div>
+
+<!-- AUTH OVERLAY -->
+<div class="overlay hidden" id="authOverlay">
+  <div class="modal" id="authModal">
+    <h3 id="authTitle">Sign in</h3>
+    <p class="m" id="authIntro">Access your saved projects from any device.</p>
+    <div class="tabs" id="authTabs">
+      <button data-mode="signin" class="on">Sign in</button>
+      <button data-mode="signup">Create account</button>
+    </div>
+    <div class="field"><label>Email</label><input type="email" id="authEmail" autocomplete="email" placeholder="you@example.com"></div>
+    <div class="field"><label>Password</label><input type="password" id="authPass" autocomplete="current-password" placeholder="••••••••"></div>
+    <button class="btn" id="authSubmit" style="width:100%">Sign in</button>
+    <div class="authmsg" id="authMsg"></div>
+    <div class="e2e">🔒 <b>End-to-end encrypted.</b> Your script text and rows are encrypted in this browser with a key from your password before upload. The server stores only unreadable ciphertext. If you forget your password, saved projects cannot be recovered.</div>
+  </div>
+</div>
+
+<!-- UNLOCK OVERLAY (session exists, key missing) -->
+<div class="overlay hidden" id="unlockOverlay">
+  <div class="modal">
+    <h3>Unlock your projects</h3>
+    <p class="m" id="unlockWho">Re-enter your password to decrypt saved work.</p>
+    <div class="field"><label>Password</label><input type="password" id="unlockPass" placeholder="••••••••"></div>
+    <button class="btn" id="unlockSubmit" style="width:100%">Unlock</button>
+    <button class="link" id="unlockSignout" style="margin-top:12px">Sign in as a different user</button>
+    <div class="authmsg" id="unlockMsg"></div>
+  </div>
+</div>
+
+<!-- MY PROJECTS MODAL -->
+<div class="overlay hidden" id="projOverlay">
+  <div class="modal wide">
+    <button class="x" id="projClose">×</button>
+    <h3>My projects</h3>
+    <p class="m">Saved, encrypted projects. Open one to resume editing.</p>
+    <div class="plist" id="projList"></div>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+/* ============================================================
+   CONFIG — paste your Supabase project values here.
+   Find them in Supabase → Project Settings → API.
+   Until both are set, the app runs in local mode
+   (no accounts, no saving) and everything else still works.
+   ============================================================ */
+const SUPABASE_URL = "YOUR_SUPABASE_URL";        // e.g. https://abcd1234.supabase.co
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const CLOUD = SUPABASE_URL.startsWith("http") && SUPABASE_ANON_KEY.length > 20;
+let sb = null;
+if (CLOUD) sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ---------------- State ---------------- */
+const App = { fileName:"", pageCount:0, lines:[], rows:[], blobs:{}, projectId:null };
+let nextId = 1;
+let cryptoKey = null;     // in-memory AES key (never persisted)
+let currentUser = null;
+
+/* ============================================================
+   ENCRYPTION  (WebCrypto: PBKDF2 -> AES-256-GCM)
+   ============================================================ */
+const _enc = new TextEncoder(), _dec = new TextDecoder();
+const _b64 = b => btoa(String.fromCharCode(...new Uint8Array(b)));
+const _ub64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function deriveKey(password, userId){
+  const base = await crypto.subtle.importKey("raw", _enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    {name:"PBKDF2", salt:_enc.encode(userId), iterations:200000, hash:"SHA-256"},
+    base, {name:"AES-GCM", length:256}, false, ["encrypt","decrypt"]);
+}
+async function encryptObj(obj){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:"AES-GCM", iv}, cryptoKey, _enc.encode(JSON.stringify(obj)));
+  return {iv:_b64(iv), ct:_b64(ct)};
+}
+async function decryptObj(iv, ct){
+  const pt = await crypto.subtle.decrypt({name:"AES-GCM", iv:_ub64(iv)}, cryptoKey, _ub64(ct));
+  return JSON.parse(_dec.decode(pt));
+}
+
+/* ============================================================
+   AUTH
+   ============================================================ */
+const $ = id => document.getElementById(id);
+let authMode = "signin";
+
+function renderWho(){
+  const who = $("who");
+  if(!CLOUD){
+    // Converter-only mode: hide all account / save controls for a clean tool.
+    who.innerHTML = "";
+    ["openProjectsBtn","saveBtn","saveBtn2"].forEach(id=>{ const el=$(id); if(el) el.style.display="none"; });
+    return;
+  }
+  if(currentUser){
+    who.innerHTML = `<b>${esc(currentUser.email)}</b>
+      <button class="btn tiny ghost" id="signoutBtn">Sign out</button>`;
+    $("signoutBtn").onclick = signOut;
+  } else {
+    who.innerHTML = `<button class="btn tiny" id="showAuthBtn">Sign in</button>`;
+    $("showAuthBtn").onclick = ()=>showOverlay("authOverlay", true);
+  }
+}
+
+function showOverlay(idStr, on){ $(idStr).classList.toggle("hidden", !on); }
+
+$("authTabs").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-mode]"); if(!b) return;
+  authMode = b.dataset.mode;
+  [...$("authTabs").children].forEach(c=>c.classList.toggle("on", c===b));
+  $("authTitle").textContent = authMode==="signup" ? "Create account" : "Sign in";
+  $("authSubmit").textContent = authMode==="signup" ? "Create account" : "Sign in";
+  $("authMsg").textContent = "";
+});
+
+$("authSubmit").addEventListener("click", async ()=>{
+  const email = $("authEmail").value.trim();
+  const pass = $("authPass").value;
+  const msg = $("authMsg");
+  if(!email || !pass){ msg.className="authmsg err"; msg.textContent="Enter email and password."; return; }
+  if(pass.length < 8){ msg.className="authmsg err"; msg.textContent="Use at least 8 characters."; return; }
+  msg.className="authmsg"; msg.innerHTML='<span class="spin"></span>Working…';
+  try{
+    if(authMode==="signup"){
+      const {data, error} = await sb.auth.signUp({email, password:pass});
+      if(error) throw error;
+      if(!data.session){
+        msg.className="authmsg ok";
+        msg.textContent="Account created. Check your email to confirm, then sign in.";
+        return;
+      }
+      await onAuthed(data.user, pass);
+    } else {
+      const {data, error} = await sb.auth.signInWithPassword({email, password:pass});
+      if(error) throw error;
+      await onAuthed(data.user, pass);
+    }
+  }catch(err){ msg.className="authmsg err"; msg.textContent = err.message || "Authentication failed."; }
+});
+
+async function onAuthed(user, password){
+  currentUser = user;
+  cryptoKey = await deriveKey(password, user.id);
+  showOverlay("authOverlay", false);
+  showOverlay("unlockOverlay", false);
+  $("authPass").value=""; $("unlockPass").value="";
+  renderWho();
+}
+
+async function signOut(){
+  if(sb) await sb.auth.signOut();
+  currentUser = null; cryptoKey = null; App.projectId = null;
+  renderWho();
+}
+
+$("unlockSubmit").addEventListener("click", async ()=>{
+  const pass = $("unlockPass").value; const msg = $("unlockMsg");
+  if(!pass){ msg.className="authmsg err"; msg.textContent="Enter your password."; return; }
+  msg.className="authmsg"; msg.innerHTML='<span class="spin"></span>Unlocking…';
+  try{
+    // re-auth verifies the password is correct before we derive the key
+    const {data, error} = await sb.auth.signInWithPassword({email:currentUser.email, password:pass});
+    if(error) throw error;
+    await onAuthed(data.user, pass);
+  }catch(err){ msg.className="authmsg err"; msg.textContent="Wrong password."; }
+});
+$("unlockSignout").addEventListener("click", async ()=>{
+  await signOut(); showOverlay("unlockOverlay", false); showOverlay("authOverlay", true);
+});
+
+async function initAuth(){
+  renderWho();
+  if(!CLOUD) return;
+  const {data} = await sb.auth.getSession();
+  if(data.session){
+    currentUser = data.session.user;
+    renderWho();
+    // session exists but encryption key is not in memory -> ask to unlock
+    $("unlockWho").textContent = `Signed in as ${currentUser.email}. Re-enter your password to decrypt saved work.`;
+    showOverlay("unlockOverlay", true);
+  }
+}
+
+function requireAuth(){
+  if(!CLOUD){ alert("Saving needs cloud setup. Add your Supabase URL and anon key in the CONFIG block of this file."); return false; }
+  if(!currentUser){ showOverlay("authOverlay", true); return false; }
+  if(!cryptoKey){ showOverlay("unlockOverlay", true); return false; }
+  return true;
+}
+
+/* ============================================================
+   SAVE / LOAD PROJECTS
+   ============================================================ */
+async function saveProject(){
+  if(!requireAuth()) return;
+  const payload = { fileName:App.fileName, pageCount:App.pageCount, rows:App.rows, savedAt:Date.now() };
+  const {iv, ct} = await encryptObj(payload);
+  try{
+    if(App.projectId){
+      const {error} = await sb.from("projects").update({iv, ciphertext:ct, updated_at:new Date().toISOString()})
+        .eq("id", App.projectId);
+      if(error) throw error;
+    } else {
+      const {data, error} = await sb.from("projects")
+        .insert({user_id:currentUser.id, iv, ciphertext:ct}).select("id").single();
+      if(error) throw error;
+      App.projectId = data.id;
+    }
+    flash("Project saved.");
+  }catch(err){ alert("Save failed: "+(err.message||err)); }
+}
+
+async function openProjects(){
+  if(!requireAuth()) return;
+  showOverlay("projOverlay", true);
+  const list = $("projList");
+  list.innerHTML = '<div class="empty"><span class="spin"></span> Loading…</div>';
+  try{
+    const {data, error} = await sb.from("projects").select("id,iv,ciphertext,updated_at")
+      .order("updated_at", {ascending:false});
+    if(error) throw error;
+    if(!data.length){ list.innerHTML = '<div class="empty">No saved projects yet.</div>'; return; }
+    const items = [];
+    for(const r of data){
+      let p;
+      try{ p = await decryptObj(r.iv, r.ciphertext); }
+      catch(e){ continue; } // skip rows this key can't decrypt
+      items.push({id:r.id, name:p.fileName||"(untitled)", rows:(p.rows||[]).filter(x=>!x.ignored).length,
+        when:new Date(r.updated_at).toLocaleString(), payload:p});
+    }
+    if(!items.length){ list.innerHTML = '<div class="empty">Saved projects could not be decrypted with this password.</div>'; return; }
+    list.innerHTML = "";
+    for(const it of items){
+      const el = document.createElement("div"); el.className="pitem";
+      el.innerHTML = `<div class="meta"><div class="nm">${esc(it.name)}</div>
+        <div class="sm">${it.rows} rows · saved ${esc(it.when)}</div></div>
+        <button class="btn tiny" data-a="open">Open</button>
+        <button class="btn tiny ghost" data-a="del">Delete</button>`;
+      el.querySelector('[data-a="open"]').onclick = ()=>{
+        App.fileName = it.payload.fileName; App.pageCount = it.payload.pageCount||0;
+        App.rows = it.payload.rows||[]; App.projectId = it.id;
+        nextId = Math.max(0, ...App.rows.map(r=>r.id||0)) + 1;
+        showOverlay("projOverlay", false); renderRows(); show(2);
+      };
+      el.querySelector('[data-a="del"]').onclick = async ()=>{
+        if(!confirm("Delete this saved project?")) return;
+        await sb.from("projects").delete().eq("id", it.id);
+        if(App.projectId===it.id) App.projectId=null;
+        openProjects();
+      };
+      list.appendChild(el);
+    }
+  }catch(err){ list.innerHTML = '<div class="empty">Could not load: '+esc(err.message||"")+'</div>'; }
+}
+
+function flash(text){
+  const w = $("who"); const old = w.innerHTML;
+  w.innerHTML = `<span style="color:var(--ok)">✓ ${esc(text)}</span>`;
+  setTimeout(renderWho, 1400);
+}
+
+$("openProjectsBtn").onclick = openProjects;
+$("saveBtn").onclick = saveProject;
+$("saveBtn2").onclick = saveProject;
+$("projClose").onclick = ()=>showOverlay("projOverlay", false);
+
+/* ============================================================
+   PARSER
+   ============================================================ */
+function stripParen(s){ return s.replace(/\s*\([^)]*\)\s*$/,"").trim(); }
+function isSceneHeader(line){
+  const t=line.trim(); if(!t) return false;
+  if(/^\d{0,3}\s*(EXT|INT)[\.\/]/i.test(t)) return true;
+  if(/\b(EXT|INT)\.\s/.test(t) && /\b(DAY|NIGHT|MORNING|EVENING|CONTINUOUS|LATER)\b/i.test(t)) return true;
+  if(/^(SCENE|ACT|FADE IN|FADE OUT|CUT TO|DISSOLVE|THE END)\b/i.test(t)) return true;
+  return false;
+}
+function isSpeaker(line){
+  let t = stripParen(line.trim());
+  if(!t) return false;
+  if(isSceneHeader(line)) return false;
+  if(t.length > 38) return false;
+  if(/[a-z]/.test(t)) return false;
+  if(!/[A-Z]/.test(t)) return false;
+  if(/[.?!,;:"]/.test(t)) return false;
+  const words = t.split(/\s+/);
+  if(words.length > 6) return false;
+  if(/^(CUT TO|FADE|DISSOLVE|TITLE|SUPER|MONTAGE|INTERCUT)\b/.test(t)) return false;
+  return true;
+}
+function splitSpeakers(src){
+  return stripParen(src).split(/\s*[\/&,]\s*|\s+AND\s+/i).map(s=>s.trim()).filter(Boolean);
+}
+function parseLines(lines){
+  const rows = []; let cur = null;
+  const push = ()=>{ if(cur){ cur.dialogue = cur.dialogue.trim(); rows.push(cur); cur=null; } };
+  for(let raw of lines){
+    const line = raw.replace(/\s+/g," ").trim();
+    if(line === ""){ push(); continue; }
+    if(isSceneHeader(line)){ push(); continue; }
+    if(isSpeaker(line)){ push(); cur = {id:nextId++, source:stripParen(line), dialogue:"", status:"valid", ignored:false}; continue; }
+    if(cur){ cur.dialogue += (cur.dialogue? " ":"") + line; }
+  }
+  push();
+  for(const r of rows){
+    if(!r.dialogue){ r.status="suspicious"; }
+    else if(r.dialogue.length > 320){ r.status="suspicious"; }
+    else if(splitSpeakers(r.source).length > 4){ r.status="suspicious"; }
+  }
+  return rows;
+}
+
+/* ---------------- PDF extraction ---------------- */
+async function extractPdf(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  const allLines = [];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    const buckets = {};
+    for(const it of tc.items){
+      if(!it.str) continue;
+      const y = Math.round(it.transform[5]);
+      (buckets[y] = buckets[y] || []).push({x:it.transform[4], s:it.str});
+    }
+    const ys = Object.keys(buckets).map(Number).sort((a,b)=>b-a);
+    for(const y of ys){
+      const parts = buckets[y].sort((a,b)=>a.x-b.x);
+      let line=""; let lastX=null;
+      for(const part of parts){
+        if(lastX!==null && part.x-lastX>4 && !/\s$/.test(line)) line += " ";
+        line += part.s; lastX = part.x + part.s.length*4;
+      }
+      allLines.push(line.trim());
+    }
+    allLines.push("");
+  }
+  return {lines:allLines, pages:pdf.numPages};
+}
+
+/* ---------------- Navigation ---------------- */
+function show(step){
+  for(let i=1;i<=4;i++) $("screen"+i).classList.toggle("hidden", i!==step);
+  document.querySelectorAll(".step").forEach(el=>{
+    const s=+el.dataset.s; el.classList.toggle("active", s===step); el.classList.toggle("done", s<step);
+  });
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+/* ---------------- Upload ---------------- */
+const drop = $("drop"), fileInput = $("file"), extractBtn = $("extractBtn");
+let chosenFile = null;
+drop.addEventListener("click",()=>fileInput.click());
+drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over")});
+drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("over");if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0]);});
+fileInput.addEventListener("change",e=>{if(e.target.files[0])setFile(e.target.files[0]);});
+$("rulesToggle").addEventListener("click",()=>{const b=$("rulesBox");b.open=!b.open;});
+function setFile(f){
+  if(f.type!=="application/pdf" && !f.name.toLowerCase().endsWith(".pdf")){ $("status1").textContent="Please choose a PDF file."; return; }
+  chosenFile=f;
+  $("fileinfo").innerHTML = `<div class="filechip">📎 ${esc(f.name)} · ${(f.size/1024).toFixed(0)} KB</div>`;
+  extractBtn.disabled=false; $("status1").textContent="";
+}
+extractBtn.addEventListener("click", async ()=>{
+  if(!chosenFile) return;
+  extractBtn.disabled=true;
+  $("status1").innerHTML='<span class="spin"></span>Extracting text and detecting dialogue…';
+  try{
+    const {lines,pages} = await extractPdf(chosenFile);
+    App.fileName = chosenFile.name.replace(/\.pdf$/i,""); App.pageCount=pages; App.lines=lines;
+    App.projectId = null; nextId = 1; App.rows = parseLines(lines);
+    $("status1").textContent=""; renderRows(); show(2);
+  }catch(err){ console.error(err); $("status1").textContent="Could not read this PDF: "+err.message; extractBtn.disabled=false; }
+});
+
+/* ---------------- Review ---------------- */
+const rowsEl = $("rows");
+function statusOf(r){ return r.ignored ? "ignored" : r.status; }
+function renderRows(){
+  rowsEl.innerHTML=""; let n=0;
+  App.rows.forEach((r,idx)=>{
+    const st=statusOf(r); const num=r.ignored?"—":(++n);
+    const tr=document.createElement("tr"); if(r.ignored) tr.className="ignored";
+    tr.innerHTML=`
+      <td>${num}</td>
+      <td><div class="src" contenteditable="true" data-f="source">${esc(r.source)}</div></td>
+      <td><div class="dlg" contenteditable="true" data-f="dialogue">${esc(r.dialogue)}</div></td>
+      <td><span class="stat ${st}">${st}</span></td>
+      <td><div class="acts">
+        <button class="iact" data-a="up">↑</button>
+        <button class="iact" data-a="merge">Merge ↑</button>
+        <button class="iact" data-a="split">Split</button>
+        ${r.ignored?'<button class="iact" data-a="restore">Restore</button>':'<button class="iact" data-a="ignore">Ignore</button>'}
+        <button class="iact danger" data-a="del">Delete</button>
+      </div></td>`;
+    tr.querySelectorAll("[contenteditable]").forEach(el=>{
+      el.addEventListener("blur",()=>{ r[el.dataset.f]=el.textContent.trim();
+        if(r.status!=="ignored"){ r.status=r.dialogue?"valid":"suspicious"; } updateCount(); });
+    });
+    tr.querySelectorAll(".iact").forEach(b=>b.addEventListener("click",()=>rowAction(b.dataset.a, idx)));
+    rowsEl.appendChild(tr);
+  });
+  updateCount();
+}
+function updateCount(){
+  const active=App.rows.filter(r=>!r.ignored).length;
+  const susp=App.rows.filter(r=>!r.ignored && r.status==="suspicious").length;
+  $("countPill").textContent = `${active} rows · ${susp} to review`;
+}
+function rowAction(a, idx){
+  const r=App.rows[idx];
+  if(a==="del"){ App.rows.splice(idx,1); }
+  else if(a==="ignore"){ r.ignored=true; }
+  else if(a==="restore"){ r.ignored=false; r.status=r.dialogue?"valid":"suspicious"; }
+  else if(a==="up"){ if(idx>0){ const t=App.rows[idx-1];App.rows[idx-1]=r;App.rows[idx]=t; } }
+  else if(a==="merge"){ if(idx>0){ const prev=App.rows[idx-1]; prev.dialogue=(prev.dialogue+" "+r.dialogue).trim();
+    prev.status=prev.dialogue?"valid":"suspicious"; App.rows.splice(idx,1); } }
+  else if(a==="split"){ const txt=r.dialogue; const mid=Math.floor(txt.length/2); const sp=txt.indexOf(" ",mid);
+    const cut=sp>0?sp:mid; const a2=txt.slice(0,cut).trim(), b2=txt.slice(cut).trim();
+    r.dialogue=a2; r.status=a2?"valid":"suspicious";
+    App.rows.splice(idx+1,0,{id:nextId++,source:r.source,dialogue:b2,status:b2?"valid":"suspicious",ignored:false}); }
+  renderRows();
+}
+$("addRowBtn").addEventListener("click",()=>{ App.rows.push({id:nextId++,source:"",dialogue:"",status:"suspicious",ignored:false}); renderRows(); });
+$("backTo1").addEventListener("click",()=>{extractBtn.disabled=false;show(1);});
+$("toExport").addEventListener("click",()=>show(3));
+$("backTo2").addEventListener("click",()=>show(2));
+function esc(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+/* ---------------- Character summary ---------------- */
+function characterCounts(active){
+  const map=new Map();
+  for(const r of active) for(const name of splitSpeakers(r.source)){ const k=name.toUpperCase(); map.set(k,(map.get(k)||0)+1); }
+  return [...map.entries()].sort((a,b)=>b[1]-a[1]);
+}
+
+/* ---------------- Export ---------------- */
+$("generateBtn").addEventListener("click", async ()=>{
+  const active=App.rows.filter(r=>!r.ignored);
+  if(!active.length){ $("status3").textContent="No active rows to export."; return; }
+  const wantX=$("optXlsx").checked, wantD=$("optDocx").checked;
+  if(!wantX && !wantD){ $("status3").textContent="Select at least one output format."; return; }
+  const blankTc=$("optBlankTc").checked, rtl=$("optRtl").checked;
+  $("status3").innerHTML='<span class="spin"></span>Generating files…'; App.blobs={};
+  try{
+    if(wantX) App.blobs.xlsx = buildXlsx(active, blankTc);
+    if(wantD) App.blobs.docx = await buildDocx(active, blankTc, rtl);
+    $("status3").textContent=""; renderResults(active); show(4);
+  }catch(err){ console.error(err); $("status3").textContent="Generation failed: "+err.message; }
+});
+function buildXlsx(active, blankTc){
+  const wb=XLSX.utils.book_new();
+  const s1=[["TIMECODE IN","SOURCE","DIALOGUE","TRANSLATION"]];
+  for(const r of active) s1.push([ blankTc?"":"", r.source, r.dialogue, "" ]);
+  const ws1=XLSX.utils.aoa_to_sheet(s1); ws1["!cols"]=[{wch:14},{wch:20},{wch:60},{wch:40}];
+  XLSX.utils.book_append_sheet(wb, ws1, "Dialogue");
+  const counts=characterCounts(active);
+  const ws2=XLSX.utils.aoa_to_sheet([["CHARACTER","APPEARANCES"], ...counts]); ws2["!cols"]=[{wch:24},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws2, "Characters");
+  const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+  return new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+async function buildDocx(active, blankTc, rtl){
+  const D=window.docx;
+  const headerRow=new D.TableRow({tableHeader:true, children:
+    ["No.","TIMECODE IN","SOURCE","DIALOGUE","TRANSLATION"].map(t=>
+      new D.TableCell({shading:{fill:"E8EDF7"},children:[ new D.Paragraph({children:[new D.TextRun({text:t,bold:true,size:20})]})]}))});
+  const rows=[headerRow];
+  function cell(text,size,bold){ return new D.TableCell({children:[ new D.Paragraph({children:[new D.TextRun({text,size,bold:!!bold})]})]}); }
+  active.forEach((r,i)=>{
+    rows.push(new D.TableRow({children:[
+      cell(String(i+1),20), cell(blankTc?"":"",20), cell(r.source,20,true), cell(r.dialogue,20),
+      new D.TableCell({children:[ new D.Paragraph({bidirectional:rtl,
+        alignment: rtl?D.AlignmentType.RIGHT:D.AlignmentType.LEFT, children:[new D.TextRun({text:"",size:20})]})]})
+    ]}));
+  });
+  const table=new D.Table({width:{size:100,type:D.WidthType.PERCENTAGE},rows});
+  const doc=new D.Document({sections:[{children:[
+    new D.Paragraph({children:[new D.TextRun({text:App.fileName||"Dubbing script",bold:true,size:28})]}),
+    new D.Paragraph({children:[new D.TextRun({text:"Translation worksheet",italics:true,size:20,color:"6B7280"})]}),
+    new D.Paragraph({text:""}), table ]}]});
+  return await D.Packer.toBlob(doc);
+}
+
+/* ---------------- Results ---------------- */
+function renderResults(active){
+  const ignored=App.rows.filter(r=>r.ignored).length;
+  const susp=active.filter(r=>r.status==="suspicious").length;
+  const speakers=characterCounts(active).length;
+  $("cards").innerHTML=[[active.length,"dialogue rows"],[speakers,"unique speakers"],[ignored,"rows ignored"],[susp,"flagged for review"]]
+    .map(([v,k])=>`<div class="card"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("");
+  const warn=$("warnArea");
+  if(susp>0){
+    const list=active.filter(r=>r.status==="suspicious").slice(0,8)
+      .map(r=>`${esc(r.source)||"(no speaker)"}: ${esc(r.dialogue.slice(0,60))||"(empty)"}`);
+    warn.innerHTML=`<div class="warnbox"><b>${susp} row(s)</b> were still flagged for review at export${susp>8?" (first 8 shown)":""}:<br>`+
+      list.map(l=>"&middot; "+l).join("<br>")+`</div>`;
+  } else warn.innerHTML="";
+  const dl=$("downloads"); dl.innerHTML="";
+  if(App.blobs.xlsx) dl.appendChild(dlBtn("Download Excel (.xlsx)", App.blobs.xlsx, App.fileName+".xlsx"));
+  if(App.blobs.docx) dl.appendChild(dlBtn("Download Word (.docx)", App.blobs.docx, App.fileName+".docx"));
+}
+function dlBtn(label, blob, name){ const b=document.createElement("button"); b.className="btn"; b.textContent=label;
+  b.addEventListener("click",()=>saveAs(blob,name)); return b; }
+$("newEpisode").addEventListener("click",()=>{
+  chosenFile=null; App.rows=[]; App.blobs={}; App.projectId=null;
+  $("fileinfo").innerHTML=""; fileInput.value=""; extractBtn.disabled=true; show(1);
+});
+
+/* ---------------- Theme ---------------- */
+const THEME_KEY = "dubprep-theme";
+const themeBtn = $("themeBtn");
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme", t);
+  themeBtn.textContent = t === "dark" ? "☀️" : "🌙";
+  themeBtn.title = t === "dark" ? "Switch to light mode" : "Switch to dark mode";
+}
+function loadTheme(){ try{ return localStorage.getItem(THEME_KEY) || "light"; }catch(e){ return "light"; } }
+applyTheme(loadTheme());
+themeBtn.onclick = ()=>{
+  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+  applyTheme(next);
+};
+
+/* ---------------- Boot ---------------- */
+show(1);
+initAuth();
+</script>
+</body>
+</html>
