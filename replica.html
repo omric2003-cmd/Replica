@@ -633,7 +633,7 @@ drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("over"
 fileInput.addEventListener("change",e=>{if(e.target.files[0])setFile(e.target.files[0]);});
 $("rulesToggle").addEventListener("click",()=>{const b=$("rulesBox");b.open=!b.open;});
 function setFile(f){
-  if(f.type!=="application/pdf" && !f.name.toLowerCase().endsWith(".pdf")){ $("status1").textContent="Please choose a PDF file."; return; }
+  if(f.type!=="application/pdf" && !f.name.toLowerCase().endsWith(".pdf")){ $("status1").textContent="Oops... this format is not accepted"; return; }
   chosenFile=f;
   $("fileinfo").innerHTML = `<div class="filechip">📎 ${esc(f.name)} · ${(f.size/1024).toFixed(0)} KB</div>`;
   extractBtn.disabled=false; $("status1").textContent="";
@@ -644,8 +644,10 @@ extractBtn.addEventListener("click", async ()=>{
   $("status1").innerHTML='<span class="spin"></span>Extracting text and detecting dialogue…';
   try{
     const {lines,pages} = await extractPdf(chosenFile);
+    const rows = parseLines(lines);
+    if(!rows.length){ $("status1").textContent="Oops... this format is not accepted"; extractBtn.disabled=false; return; }
     App.fileName = chosenFile.name.replace(/\.pdf$/i,""); App.pageCount=pages; App.lines=lines;
-    App.projectId = null; nextId = 1; App.rows = parseLines(lines);
+    App.projectId = null; nextId = 1; App.rows = rows;
     $("status1").textContent=""; renderRows(); show(2);
   }catch(err){ console.error(err); $("status1").textContent="Could not read this PDF: "+err.message; extractBtn.disabled=false; }
 });
