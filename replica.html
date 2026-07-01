@@ -729,7 +729,7 @@ function buildXlsx(active, blankTc){
   const wb=XLSX.utils.book_new();
   const s1=[["TIMECODE IN","SOURCE","DIALOGUE","TRANSLATION"]];
   for(const r of active) s1.push([ blankTc?"":"", r.source, r.dialogue, "" ]);
-  const ws1=XLSX.utils.aoa_to_sheet(s1); ws1["!cols"]=[{wch:14},{wch:20},{wch:60},{wch:40}];
+  const ws1=XLSX.utils.aoa_to_sheet(s1); ws1["!cols"]=[{wch:14},{wch:15},{wch:70},{wch:35}];
   XLSX.utils.book_append_sheet(wb, ws1, "Dialogue");
   const counts=characterCounts(active);
   const ws2=XLSX.utils.aoa_to_sheet([["CHARACTER","APPEARANCES"], ...counts]); ws2["!cols"]=[{wch:24},{wch:14}];
