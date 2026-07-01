@@ -626,10 +626,21 @@ function show(step){
 /* ---------------- Upload ---------------- */
 const drop = $("drop"), fileInput = $("file"), extractBtn = $("extractBtn");
 let chosenFile = null;
+function handleDrop(e){
+  if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  else $("status1").textContent="Oops... this format is not accepted";
+}
 drop.addEventListener("click",()=>fileInput.click());
 drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over")});
 drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
-drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("over");if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0]);});
+drop.addEventListener("drop",e=>{e.preventDefault();e.stopPropagation();drop.classList.remove("over");handleDrop(e);});
+// Catch drops that land anywhere on the page outside the drop-zone itself,
+// so the browser doesn't fall back to navigating to/opening the dropped file.
+window.addEventListener("dragover",e=>e.preventDefault());
+window.addEventListener("drop",e=>{
+  e.preventDefault();
+  if(!$("screen1").classList.contains("hidden")) handleDrop(e);
+});
 fileInput.addEventListener("change",e=>{if(e.target.files[0])setFile(e.target.files[0]);});
 $("rulesToggle").addEventListener("click",()=>{const b=$("rulesBox");b.open=!b.open;});
 function setFile(f){
