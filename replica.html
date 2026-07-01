@@ -555,9 +555,7 @@ function isSpeaker(line){
   if(!t) return false;
   if(isSceneHeader(line)) return false;
   if(t.length > 38) return false;
-  if(/[a-z]/.test(t)) return false;
-  if(!/[A-Z]/.test(t)) return false;
-  if(/[.?!,;:"]/.test(t)) return false;
+  if(!/^[A-Z][A-Z\s\/&'\-]*$/.test(t)) return false;
   const words = t.split(/\s+/);
   if(words.length > 6) return false;
   if(/^(CUT TO|FADE|DISSOLVE|TITLE|SUPER|MONTAGE|INTERCUT)\b/.test(t)) return false;
@@ -656,7 +654,9 @@ extractBtn.addEventListener("click", async ()=>{
   try{
     const {lines,pages} = await extractPdf(chosenFile);
     const rows = parseLines(lines);
-    if(!rows.length){ $("status1").textContent="Oops... this format is not accepted"; extractBtn.disabled=false; return; }
+    const MIN_VALID_ROWS = 5;
+    const validRows = rows.filter(r=>r.status==="valid" && r.dialogue).length;
+    if(validRows < MIN_VALID_ROWS){ $("status1").textContent="Oops... this format is not accepted"; extractBtn.disabled=false; return; }
     App.fileName = chosenFile.name.replace(/\.pdf$/i,""); App.pageCount=pages; App.lines=lines;
     App.projectId = null; nextId = 1; App.rows = rows;
     $("status1").textContent=""; renderRows(); show(2);
