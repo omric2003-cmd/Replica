@@ -69,6 +69,7 @@
   .btn.tiny{padding:4px 9px;font-size:11.5px;border-radius:6px}
   .row-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;align-items:center}
   .status{margin-top:16px;font-size:13px;color:var(--muted)}
+  .status.err{color:var(--bad);font-size:16px;font-weight:700}
   .filechip{display:inline-flex;align-items:center;gap:8px;background:var(--chip);
     border-radius:8px;padding:6px 12px;color:var(--ink);font-size:13px;margin-top:14px}
   .link{background:none;border:none;color:var(--brand);cursor:pointer;font-size:12.5px;
@@ -624,9 +625,10 @@ function show(step){
 /* ---------------- Upload ---------------- */
 const drop = $("drop"), fileInput = $("file"), extractBtn = $("extractBtn");
 let chosenFile = null;
+function showRejected(){ const el=$("status1"); el.textContent="Oops... this format is not accepted"; el.classList.add("err"); }
 function handleDrop(e){
   if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
-  else $("status1").textContent="Oops... this format is not accepted";
+  else showRejected();
 }
 drop.addEventListener("click",()=>fileInput.click());
 drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over")});
@@ -642,21 +644,22 @@ window.addEventListener("drop",e=>{
 fileInput.addEventListener("change",e=>{if(e.target.files[0])setFile(e.target.files[0]);});
 $("rulesToggle").addEventListener("click",()=>{const b=$("rulesBox");b.open=!b.open;});
 function setFile(f){
-  if(f.type!=="application/pdf" && !f.name.toLowerCase().endsWith(".pdf")){ $("status1").textContent="Oops... this format is not accepted"; return; }
+  if(f.type!=="application/pdf" && !f.name.toLowerCase().endsWith(".pdf")){ showRejected(); return; }
   chosenFile=f;
   $("fileinfo").innerHTML = `<div class="filechip">📎 ${esc(f.name)} · ${(f.size/1024).toFixed(0)} KB</div>`;
-  extractBtn.disabled=false; $("status1").textContent="";
+  extractBtn.disabled=false; $("status1").classList.remove("err"); $("status1").textContent="";
 }
 extractBtn.addEventListener("click", async ()=>{
   if(!chosenFile) return;
   extractBtn.disabled=true;
+  $("status1").classList.remove("err");
   $("status1").innerHTML='<span class="spin"></span>Extracting text and detecting dialogue…';
   try{
     const {lines,pages} = await extractPdf(chosenFile);
     const rows = parseLines(lines);
     const MIN_VALID_ROWS = 5;
     const validRows = rows.filter(r=>r.status==="valid" && r.dialogue).length;
-    if(validRows < MIN_VALID_ROWS){ $("status1").textContent="Oops... this format is not accepted"; extractBtn.disabled=false; return; }
+    if(validRows < MIN_VALID_ROWS){ showRejected(); extractBtn.disabled=false; return; }
     App.fileName = chosenFile.name.replace(/\.pdf$/i,""); App.pageCount=pages; App.lines=lines;
     App.projectId = null; nextId = 1; App.rows = rows;
     $("status1").textContent=""; renderRows(); show(2);
