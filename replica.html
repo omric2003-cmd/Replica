@@ -31,8 +31,8 @@
   header.app{background:var(--panel);border-bottom:1px solid var(--line);padding:12px 22px;
     display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10}
   header.app h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.01em}
-  header.app .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);
-    padding:2px 7px;border-radius:20px}
+  header.app .brandwrap{display:flex;flex-direction:column;gap:1px}
+  header.app .tagline{margin:0;font-size:13px;color:var(--muted);font-weight:400}
   header.app .spacer{flex:1}
   header.app .who{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:10px}
   header.app .who b{color:var(--ink);font-weight:600}
@@ -156,8 +156,10 @@
 </head>
 <body>
 <header class="app">
-  <h1>Replica</h1>
-  <span class="tag">Script → translation sheet</span>
+  <div class="brandwrap">
+    <h1>Replica</h1>
+    <p class="tagline">Turns a dubbing script PDF into translator-ready working files.</p>
+  </div>
   <div class="spacer"></div>
   <div class="who" id="who"></div>
   <button class="themebtn" id="themeBtn" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
@@ -175,6 +177,7 @@
   <section class="panel" id="screen1">
     <h2 class="sec">Upload a script PDF</h2>
     <p class="sub">One episode at a time. Dialogue is detected from uppercase speaker labels.</p>
+    <p class="sub">The name comes from the dubbing term for a single spoken line — a <i>replica</i> — which is exactly the unit the app extracts.</p>
     <div class="drop" id="drop">
       <div class="ic">📄</div>
       <div class="big">Drag &amp; drop your script PDF here</div>
@@ -194,6 +197,7 @@
         <li><b>Wrapped dialogue</b> — following non-speaker lines are joined until the next speaker or a blank line.</li>
         <li><b>Scene headers</b> — lines such as "1 EXT. GARDEN - DAY" are ignored.</li>
         <li><b>Description / action</b> — prose paragraphs without a speaker label are ignored.</li>
+        <li><b>Multi-speaker</b> — grouped names stay in one source cell, but each name is counted separately.</li>
         <li><b>Review flags</b> — ambiguous rows are marked <i>suspicious</i> for you to confirm.</li>
       </ul>
     </details>
