@@ -31,6 +31,7 @@
   header.app{background:var(--panel);border-bottom:1px solid var(--line);padding:12px 22px;
     display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10}
   header.app h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.01em}
+  header.app .logo{height:40px;width:auto;object-fit:contain;flex-shrink:0;border-radius:6px}
   header.app .brandwrap{display:flex;flex-direction:column;gap:1px}
   header.app .tagline{margin:0;font-size:13px;color:var(--muted);font-weight:400}
   header.app .spacer{flex:1}
@@ -156,6 +157,7 @@
 </head>
 <body>
 <header class="app">
+  <img class="logo" src="assets/logo.png" alt="Replica logo" />
   <div class="brandwrap">
     <h1>Replica</h1>
     <p class="tagline">Turns a dubbing script PDF into translator-ready working files.</p>
